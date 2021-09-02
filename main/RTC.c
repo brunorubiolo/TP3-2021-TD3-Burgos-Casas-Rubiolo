@@ -1,52 +1,47 @@
 /*==================[ Inclusiones ]============================================*/
 #include "../include/RTC.h"
-
+#include "../include/I2C.h"
 
 /*==================[Prototipos de funciones]======================*/
-static esp_err_t i2c_master_init(void);
-//static esp_err_t i2c_master_read_slave(i2c_port_t i2c_num, uint8_t *data_rd, size_t size);
-//static esp_err_t i2c_master_write_slave(i2c_port_t i2c_num, uint8_t *data_wr, size_t size);
+void RTC_read(uint8_t instruccion, uint8_t *variable);
+void RTC_setTime(uint8_t second, uint8_t minute, uint8_t hour, uint8_t dayOfWeek, uint8_t
+                   dayOfMonth, uint8_t month, uint8_t year);
+
+//=========================== Definiciones ================================
+#define ESP_SLAVE_ADDR_RTC 0x68                /*!< ESP32 slave address, you can set any 7bit value */
 
 
 /*==================[Implementaciones]=================================*/
 
-static void RTC_init(){
-    print_mux = xSemaphoreCreateMutex();
-    ESP_ERROR_CHECK(i2c_master_init());
+
+/*========================================================================
+Funcion: RTC_read
+Descripcion: Lee la fecha y hora desde el RTC
+Parametro de entrada:
+       uint8_t instruccion: Indica que parametro se quiere leer 
+                #define SEGUNDOS 0X00 
+                #define MINUTOS 0X01
+                #define HORA 0X02
+                #define DIA_SEMANA 0X03  //Establece el dia de la semana del 1 al 7
+                #define DIA_MES 0X04     //Establece el numero del dia en el mes
+                #define MES 0X05
+                #define ANIO 0X06
+       uint8_t *variable: Puntero hacia la variable donde se quiere guardar el dato obtenido del RTC
+No retorna nada
+========================================================================*/
+void RTC_read(uint8_t instruccion, uint8_t *variable){ 
+    Send_i2c(instruccion, ESP_SLAVE_ADDR_RTC); //Envia al i2c a la direccion del RTC la instruccion del valor que se quiere obtener
+    Read_i2c(variable, ESP_SLAVE_ADDR_RTC); //Se lee lo que retorna el RTC esclavo por el puerto I2C y se guarda el dato en la variable referida por puntero
 }
 
 
-
-void RTC_read(uint8_t instruccion, uint8_t *variable){  //La primera variable indica la intruccion a leer. La segunda variable es la direccion de la variable donde se va a guardar el dato de retorno
-    
-    int ret;
-
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (ESP_SLAVE_ADDR << 1) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write(cmd, &instruccion, 1, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-
-    if (ret == ESP_OK) {
-         
-            i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-            i2c_master_start(cmd);
-            i2c_master_write_byte(cmd, (ESP_SLAVE_ADDR << 1) | READ_BIT, ACK_CHECK_EN);
-            if (1 > 1) {
-                i2c_master_read(cmd, variable, 1 - 1, ACK_VAL);
-            }
-            i2c_master_read_byte(cmd, variable + 1 - 1, NACK_VAL);
-            i2c_master_stop(cmd);
-            i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, 1000 / portTICK_RATE_MS);
-            i2c_cmd_link_delete(cmd);
-            
-   }else{
-         printf("Errro en RTC : %s!\n", esp_err_to_name(ret));
-    }      
-}
-
+/*========================================================================
+Funcion: dec2bcd
+Descripcion: Convierte numero decimal a bcd
+Parametro de entrada:
+       uint8_t num: Numero a convertir en decimal
+Retorna: numero convertido a bcd
+========================================================================*/
 uint8_t dec2bcd(uint8_t num)
 {
     uint8_t ones = 0;
@@ -58,99 +53,39 @@ uint8_t dec2bcd(uint8_t num)
     return (tens + ones);
 }
 
+
+/*========================================================================
+Funcion: RTC_setTime
+Descripcion: Establece la fecha y hora del RTC
+Parametro de entrada:
+       uint8_t second: Valor de los segundos a establecer en el RTC en decimal
+       uint8_t minute: Valor de los minutos a establecer en el RTC en decimal
+       uint8_t hour: Valor de la hora a establecer en el RTC en decimal
+       uint8_t dayOfWeek: Valor del dia de la semana (1-7) a establecer en el RTC en decimal
+       uint8_t dayOfMonth: Valor del dia del mes a establecer en el RTC en decimal
+       uint8_t month: Valor del numero del mes a establecer en el RTC en decimal
+       uint8_t year: Valor del numero del año en formato xx a establecer en el RTC en decimal
+No retorna nada
+========================================================================*/
 void RTC_setTime(uint8_t second, uint8_t minute, uint8_t hour, uint8_t dayOfWeek, uint8_t
                    dayOfMonth, uint8_t month, uint8_t year){
 
-    uint8_t second_bcd=dec2bcd(second)&0b01111111; 
-    uint8_t minute_bcd=dec2bcd(minute)&0b01111111;  
-    uint8_t hour_bcd=dec2bcd(hour)&0b00111111;
-    uint8_t dayOfWeek_bcd=dec2bcd(dayOfWeek)&0b00000111;
-    uint8_t dayOfMonth_bcd=dec2bcd(dayOfMonth)&0b00111111;
-    uint8_t month_bcd=dec2bcd(month)&0b00011111;
-    uint8_t year_bcd=dec2bcd(year);
-    
-              
-    int ret;
-    uint8_t instruccion=0x00;
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (ESP_SLAVE_ADDR << 1) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write(cmd, &instruccion, 1, ACK_CHECK_EN);
-    i2c_master_write(cmd, &second_bcd, 1, ACK_CHECK_EN);
-    i2c_master_write(cmd, &minute_bcd, 1, ACK_CHECK_EN);
-    i2c_master_write(cmd, &hour_bcd, 1, ACK_CHECK_EN);
-    i2c_master_write(cmd, &dayOfWeek_bcd, 1, ACK_CHECK_EN);
-    i2c_master_write(cmd, &dayOfMonth_bcd, 1, ACK_CHECK_EN);
-    i2c_master_write(cmd, &month_bcd, 1, ACK_CHECK_EN);
-    i2c_master_write(cmd, &year_bcd, 1, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
+    uint8_t arreglo_datos[7]; //Arreglo para almacenar todos los valores a establecer y luego enviar solo el arreglo
+    arreglo_datos[0]=0x00; //Instruccion de donde se quiere empezar a modificar los datos, en este caso se modifica desde la posicion cero que es la posicoon de los segundos, Ver datasheet DS3231
+    //Los datos se convierten de decimal a BCD para que queden los dos numeros decimales separado (Asi los establece el datasheet). Por ejemplo para la hora 23 quedan los dos numeros separado en dos nibles de 4 bits
+    arreglo_datos[1]=dec2bcd(second)&0b01111111;//Se convierte los segundos de decimal a BCD y se le coloca la mascara correspondiente con el datasheet DS3231 
+    arreglo_datos[2]=dec2bcd(minute)&0b01111111;//Se realiza lo mismo   
+    arreglo_datos[3]=dec2bcd(hour)&0b00111111;//Se realiza lo mismo  
+    arreglo_datos[4]=dec2bcd(dayOfWeek)&0b00000111;//Se realiza lo mismo  
+    arreglo_datos[5]=dec2bcd(dayOfMonth)&0b00111111;//Se realiza lo mismo  
+    arreglo_datos[6]=dec2bcd(month)&0b00011111;//Se realiza lo mismo  
+    arreglo_datos[7]=dec2bcd(year);//Se realiza lo mismo
+    //char arreglo_datos[] ={ 0x00,dec2bcd(second)&0b01111111,dec2bcd(minute)&0b01111111,dec2bcd(hour)&0b00111111,dec2bcd(dayOfWeek)&0b00000111,dec2bcd(dayOfMonth)&0b00111111,dec2bcd(month)&0b00011111,dec2bcd(year)};
+    uint8_t ret = Send_array_i2c(arreglo_datos, 7, ESP_SLAVE_ADDR_RTC); //Envia el arreglo por i2c al RTC  
 
-    if (ret == ESP_OK) {
-        printf("Fecha cambiada\n");
-    }else{
-         printf("Errro en RTC : %s!\n", esp_err_to_name(ret));
-     }                     
-
-}
-
-
-
-
-//i2c master initialization
-static esp_err_t i2c_master_init(void)
-{
-    int i2c_master_port = I2C_MASTER_NUM;       //Puerto I2C a utilizar - 0 o 1
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,                //Modo maestro
-        .sda_io_num = I2C_MASTER_SDA_IO,        //Pin SDA
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,    //Habilita pull up en SDA
-        .scl_io_num = I2C_MASTER_SCL_IO,        //Pin SCL
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,    //Habilita pull up en SCL
-        .master.clk_speed = I2C_MASTER_FREQ_HZ, //Frecuencia de clock
-        //.clk_flags = 0,  /*!< Optional, you can use I2C_SCLK_SRC_FLAG_* flags to choose i2c source clock here. */
-    };
-    //Establece la configuración con los datos previamente cargados
-    esp_err_t err = i2c_param_config(i2c_master_port, &conf);
-    if (err != ESP_OK) {
-        return err;
+    if(ret==1){
+        printf("Fecha y hora cambiada\n");
     }
-    //si no hay error, instala el driver sin buffers porque es maestro y devuelve el valor de error correspondiente
-    return i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
-}
+          
 
-/*
-//The data will be stored in slave buffer. We can read them out from slave buffer.
-static esp_err_t i2c_master_write_slave(i2c_port_t i2c_num, uint8_t *data_wr, size_t size)
-{
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (ESP_SLAVE_ADDR << 1) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write(cmd, data_wr, size, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
 }
-
-//We need to fill the buffer of esp slave device, then master can read them out.
-static esp_err_t i2c_master_read_slave(i2c_port_t i2c_num, uint8_t *data_rd, size_t size)
-{
-    if (size == 0) {
-        return ESP_OK;
-    }
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (ESP_SLAVE_ADDR << 1) | READ_BIT, ACK_CHECK_EN);
-    if (size > 1) {
-        i2c_master_read(cmd, data_rd, size - 1, ACK_VAL);
-    }
-    i2c_master_read_byte(cmd, data_rd + size - 1, NACK_VAL);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
-
-*/

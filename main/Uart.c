@@ -1,6 +1,7 @@
 #include "../include/Uart.h"
 #include "../include/RTC.h"
 
+//=========================== Definiciones ================================
 #define PIN_TX (UART_PIN_NO_CHANGE)
 #define PIN_RX (UART_PIN_NO_CHANGE)
 #define PIN_RTS (UART_PIN_NO_CHANGE)
@@ -15,18 +16,28 @@
 //========================== Prototipos ====================================
 static void tareaEco(void *arg);
 
-//===================== Funcion principal ====================================
+
+/*==================[Implementaciones]=================================*/
+
+
+/*========================================================================
+Funcion: config_Uart
+Descripcion: Crea una tarea encargada de monitoriar el Uart y procesar el dato recibido
+No retorna nada
+========================================================================*/
 void config_Uart(void)
 {
-    xTaskCreatePinnedToCore(tareaEco, "uart_tareaEco", configMINIMAL_STACK_SIZE*3, NULL, tskIDLE_PRIORITY+1, NULL, PROCESADORB);
+    xTaskCreatePinnedToCore(tareaEco, "uart_tareaEco", configMINIMAL_STACK_SIZE*5, NULL, tskIDLE_PRIORITY+1, NULL, PROCESADORB);
 
 
 }
 
-//===================== Variables ====================================
 
-
-//========================== Funciones ====================================
+/*========================================================================
+Funcion: tareaEco
+Descripcion: Funcion de la tarea
+No retorna nada
+========================================================================*/
 static void tareaEco(void *arg)
 {
     // Parámetros de configuración para la UART
@@ -38,6 +49,7 @@ static void tareaEco(void *arg)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_APB,
     };
+
     // Configura la UART con los parámetros anteriores    
     ESP_ERROR_CHECK(uart_param_config(UART_PORT_NUM, &uartConfig));
 
@@ -63,17 +75,18 @@ static void tareaEco(void *arg)
         int len = uart_read_bytes(UART_PORT_NUM, data, BUF_SIZE, 20 / portTICK_RATE_MS); //lee desde la UART
         vTaskDelay(1000/portTICK_PERIOD_MS);
         
- //       20/06/19 - 22:02:03
-
-        if(len==19){     // si recibo 5 datos  +A///
-            if(data[2]=='/' && data[5]=='/' && data[8]==' ' && data[9]=='-' && data[10]==' ' && data[13]==':' && data[16]==':' ){ // ASCII 47 = /
+        if(len==19){     // Si recibo la cantidad de caracteres correctos
+            if(data[2]=='/' && data[5]=='/' && data[8]==' ' && data[9]=='-' && data[10]==' ' && data[13]==':' && data[16]==':' ){ // Si la estructura es la correcta
+               
+                //Convierto la cadena de caracteres recibida a los valores correspondientes con los parametros a modificar 
                 uint8_t dia=(data[0]-48)*10+(data[1]-48);
                 uint8_t mes=(data[3]-48)*10+(data[4]-48);
                 uint8_t anio=(data[6]-48)*10+(data[7]-48);
                 uint8_t hora=(data[11]-48)*10+(data[12]-48);
                 uint8_t minutos=(data[14]-48)*10+(data[15]-48);
                 uint8_t segundos=(data[17]-48)*10+(data[18]-48);
-                RTC_setTime(segundos, minutos, hora, 1, dia, mes, anio);
+
+                RTC_setTime(segundos, minutos, hora, 1, dia, mes, anio); //Establesco los valores recibidos como valores nuevos del RTC
                 // second, minute, hour, dayOfWeek 1-7, dayOfMonth, month, year)
             }
         }
