@@ -1,0 +1,32 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"terminal.integrated.shell.windows" : "cmd.exe",
+		"terminal.integrated.shellArgs.windows" : [
+			"/k",
+			"C:/esp/esp-idf/export.bat"
+		],
+		"files.associations": {
+			"soc.h": "c",
+			"sdkconfig.h": "c",
+			"cstddef": "c",
+			"rtc_wdt.h": "c",
+			"rtc.h": "c",
+			"freertos.h": "c",
+			"rtc_cntl_reg.h": "c",
+			"array": "c",
+			"string": "c",
+			"string_view": "c",
+			"lcdi2c.h": "c",
+			"sstream": "c",
+			"i2c.h": "c",
+			"string.h": "c",
+			"esp_log.h": "c",
+			"freertosconfig.h": "c"
+		}
+	}
+}
